@@ -1,0 +1,337 @@
+---
+title: "Analisis Popularitas dan Pendapatan Genre Film pada Database Sakila"
+author: "Nafidatul Fatimah | M0725083"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+---
+<style>
+
+/* Judul */
+.title {
+  text-align: center;
+  font-size: 38px;
+  font-weight: bold;
+  color: #551a8b;
+
+  margin-top: 5px;
+  margin-bottom: 5px;
+
+  line-height: 1.2;
+}
+
+/* Nama penulis */
+.author {
+  text-align: center;
+  font-size: 18px;
+  color: #d63384;
+  margin-top: 10px;
+  margin-bottom: 5px;
+}
+
+/* Tanggal */
+.date {
+  text-align: center;
+  color: #6a3d7a;
+  font-size: 14px;
+}
+
+/* Garis pembatas */
+.title-divider {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, #d63384, #a64dff);
+  margin: 15px auto 20px auto;
+  border-radius: 10px;
+}
+
+
+/* Background utama */
+body {
+  background: linear-gradient(to bottom, #fff0f6, #f8f0ff);
+  font-family: 'Segoe UI', sans-serif;
+  color: #4a235a;
+  line-height: 1.8;
+}
+
+/* Heading */
+h1, h2, h3 {
+  color: #b030b0;
+  font-weight: bold;
+}
+
+/* Box */
+.box {
+  background-color: white;
+  border-left: 6px solid #d63384;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0px 3px 10px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+/* Table */
+table {
+  background-color: white;
+}
+/* TOC */
+#TOC {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 10px;
+  border: 2px solid #f3c4fb;
+}
+
+/* Code */
+pre {
+  border-radius: 12px;
+  border: 1px solid #f3c4fb;
+}
+
+/* Grafik */
+img {
+  border-radius: 12px;
+}
+
+</style>
+
+<div class="title-divider"></div>
+
+# A. Pendahuluan
+
+<div class="box">
+
+Database **Sakila** merupakan database yang disediakan oleh MySQL untuk menggambarkan tentang sistem penyewaan film. Pada analisis ini dilakukan pengamatan terhadap hubungan antara **popularitas genre film** dengan **pendapatan yang dihasilkan**.
+Analisis dilakukan dengan tujuan untuk mengetahui:
+
+1. Genre film yang paling sering disewa.
+2. Genre yang menghasilkan pendapatan terbesar.
+3. Hubungan antara jumlah rental dan total pendapatan.
+
+</div>
+
+# B. Persiapan data
+
+## 1. Import Library
+```{r, warning=FALSE, message=FALSE}
+library(DBI)
+library(odbc)
+library(dplyr)
+library(ggplot2)
+```
+
+## 2. Koneksi Database
+
+```{r}
+# Melakukan koneksi ke database
+skla = dbConnect(odbc(),
+               Driver = "MySQL ODBC 8.0 ANSI Driver",
+               Server = "127.0.0.1",
+               UID = "root",
+               PWD = "admin123",
+               Port = 3306,
+               database = "sakila")
+```
+
+# C. Pengambilan Data
+
+## 1. Deskripsi Insight Data
+
+<div class="box">
+
+Data yang diambil merupakan data transaksi penyewaan film berdasarkan kategori atau genre film pada database Sakila.
+Variabel yang digunakan:
+
+- **genre** = nama kategori film.
+- **total_rental** = jumlah penyewaan film.
+- **total_revenue** = total pendapatan dari penyewaan.
+- **avg_payment** = rata-rata pembayaran tiap transaksi.
+Analisis ini bertujuan untuk mengetahui genre yang paling populer dan paling menguntungkan.
+
+</div>
+
+## 2. Query SQL
+
+```{r}
+genre_data = dbGetQuery(skla, "SELECT c.name AS genre, COUNT(r.rental_id) AS total_rental, SUM(p.amount) AS total_revenue,
+    AVG(p.amount) AS avg_payment
+FROM category c
+JOIN film_category k ON c.category_id = k.category_id
+JOIN film f ON k.film_id = f.film_id
+JOIN inventory i ON f.film_id = i.film_id
+JOIN rental r ON i.inventory_id = r.inventory_id
+JOIN payment p ON r.rental_id = p.rental_id
+GROUP BY c.name
+ORDER BY total_revenue DESC;")
+```
+
+## 3. Menampilkan Data
+
+```{r}
+# Menampilkan Data
+
+head(genre_data)
+```
+
+```{r}
+# Statistik Deskriptif
+summary(genre_data)
+```
+
+# D. Visualisasi Data
+
+## 1. Popularitas Genre Berdasarkan Jumlah Rental
+
+```{r}
+ggplot(genre_data, aes(x = reorder(genre, total_rental),
+           y = total_rental,
+           fill = total_rental)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(
+    title = "Popularitas Genre Berdasarkan Jumlah Rental",
+    x = "Genre",
+    y = "Jumlah Rental"
+  ) +
+  scale_fill_gradient(low = "plum1", high = "orchid4") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold",
+      color = "orchid4"
+    ),
+    axis.text = element_text(color = "purple4")
+  )
+```
+
+### 1.1 Interpretasi
+
+<div class="box">
+
+Berdasarkan grafik batang di atas, kita dapat melihat distribusi popularitas genre film di Database Sakila secara berurutan. Genre **Sports** menempati posisi tertinggi dengan total rental terbanyak, hal ini menjadikannya genre yang paling diminati oleh pelanggan. Sebaliknya, genre **Music** memiliki frekuensi penyewaan paling rendah selama periode ini. Dari informasi ini, dapat digunakan sebagai acuan strategi untuk memperbanyak stok film pada genre-genre populer demi meningkatkan pendapatan.
+
+</div>
+
+## 2. Total Pendapatan Berdasarkan Genre
+
+```{r}
+ggplot(genre_data,
+       aes(x = reorder(genre, total_revenue),
+           y = total_revenue,
+           fill = total_revenue)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(
+    title = "Total Pendapatan Berdasarkan Genre",
+    x = "Genre",
+    y = "Total Pendapatan"
+  ) +
+  scale_fill_gradient(low = "lightpink1", high = "hotpink3") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold",
+      color = "orchid4"
+    ),
+    axis.text = element_text(color = "purple4")
+  )
+```
+### 2.1 Interpretasi
+
+<div class="box">
+
+Dari grafik tersebut, genre **Sports** terbukti menjadi sumber pendapatan terbesar bagi perusahaan dengan total perolehan tertinggi dibandingkan genre lainnya. Di sisi lain, genre **Music** memberikan kontribusi pendapatan yang paling minimal.
+
+</div>
+
+## 3. Hubungan Popularitas Genre dan Pendapatan
+
+### 3.1 Persamaan Matematis
+
+Hubungan antara jumlah rental dan pendapatan dapat dituliskan dalam bentuk persamaan linear:
+$$
+Y = a + bX
+$$
+
+dengan:
+
+- \(Y\) = total pendapatan
+- \(X\) = jumlah rental
+- \(a\) = konstanta
+- \(b\) = koefisien regresi
+
+### 3.2 Visualisasi Menggunakan Scatter Plot
+
+```{r}
+ggplot(genre_data,
+       aes(x = total_rental,
+           y = total_revenue,
+           label = genre)) +
+  geom_point(size = 2, color = "hotpink") +
+  geom_text(vjust = -0.5, color = "purple4") +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "orchid1") +
+  labs(
+    title = "Hubungan Popularitas Genre dan Total Pendapatan",
+    x = "Jumlah Rental",
+    y = "Total Pendapatan"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 16,
+      face = "bold",
+      color = "orchid4"
+    )
+  )
+```
+
+### 3.3 Interpretasi
+
+<div class="box">
+
+Grafik scatterplot di atas memperlihatkan hubungan antara jumlah rental (popularitas) dan total pendapatan dari setiap genre film pada Database Sakila. Garis tren linear yang bergerak naik ke kanan atas menunjukkan adanya korelasi positif yang kuat antara kedua variabel. Hal ini berarti tinggi rendahnya pendapatan perusahaan sangat bergantung pada volume penyewaan film. Pola ini mengonfirmasi bahwa strategi mempertahankan atau menambah volume sewa pada genre populer akan berbanding lurus dengan peningkatan profitabilitas perusahaan.
+
+</div>
+
+### 3.4 Analisis Korelasi
+
+```{r}
+korel <- cor(genre_data$total_rental, genre_data$total_revenue)
+
+korel
+```
+#### Interpretasi
+<div class="box">
+
+Berdasarkan hasil uji korelasi Pearson antara variabel total_rental (popularitas) dan total_revenue (total pendapatan), diperoleh nilai koefisien korelasi sebesar 0.851.Nilai yang mendekati angka 1 ini menunjukkan adanya hubungan positif yang sangat kuat dan signifikan antara kedua variabel tersebut. Hal ini mengonfirmasi secara kuantitatif bahwa kuantitas penyewaan film merupakan faktor utama bagi pendapatan yang dihasilkan oleh setiap genre pada Database Sakila. Semakin tinggi frekuensi rental suatu genre, semakin besar pula kontribusi finansial yang diberikan kepada perusahaan.
+
+</div>
+
+# E. Kesimpulan
+
+<div class="box">
+
+Berdasarkan hasil analisis database Sakila dapat disimpulkan bahwa:
+
+1. Genre film tertentu memiliki tingkat popularitas yang lebih tinggi dibanding genre lainnya.
+2. Genre dengan jumlah rental tinggi cenderung menghasilkan pendapatan lebih besar.
+3. Terdapat hubungan positif antara jumlah rental dan total pendapatan.
+4. Analisis ini dapat membantu perusahaan rental film dalam menentukan strategi bisnis dan pengelolaan koleksi film.
+
+</div>
+
+# F. Penutup
+```{r}
+dbDisconnect(skla)
+```
